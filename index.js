@@ -6,7 +6,7 @@
 const { join } = require('path');
 const { remote: { BrowserWindow } } = require('electron');
 const { Plugin } = require('powercord/entities');
-const { Tooltip, Icons: { ExternalLink } } = require('powercord/components');
+const { Tooltip, PopoutWindow, Icons: { ExternalLink } } = require('powercord/components');
 const { inject, uninject } = require('powercord/injector');
 const { React, getModule, getModuleByDisplayName, constants: { Routes } } = require('powercord/webpack');
 const { open: openModal } = require('powercord/modal');
@@ -18,11 +18,11 @@ const Modal = require('./components/Modal');
 
 module.exports = class Multitask extends Plugin {
   async startPlugin () {
-    if (window.GlasscordApi) { // @todo: Glasscord compatibility
-      this.error('Glasscord detected. Multitask is not compatible with Glasscord yet.');
-      this.error('Aborting startup.');
-      return;
-    }
+    // if (window.GlasscordApi) { // @todo: Glasscord compatibility
+    //   this.error('Glasscord detected. Multitask is not compatible with Glasscord yet.');
+    //   this.error('Aborting startup.');
+    //   return;
+    // }
 
     this.loadStylesheet('style.scss');
     powercord.api.settings.registerSettings('multitask', {
@@ -144,59 +144,14 @@ module.exports = class Multitask extends Plugin {
   }
 
   _openPopout (guildId, channelId) {
-    // eslint-disable-next-line new-cap
-    const route = `https:${GLOBAL_ENV.WEBAPP_ENDPOINT}${Routes.CHANNEL(guildId, channelId)}`;
-    const func = (async () => {
-      // Await for Webpack load
-      while (!require('powercord/webpack').instance) {
-        await require('powercord/util').sleep(1);
+    const channel = require('powercord/util').getOwnerInstance(document.querySelector('.chat-3bRxxu'));
+    getModule([ 'setAlwaysOnTop', 'open' ], false).open('DISCORD_POWERCORD_MULTITASK', (key) => (
+      React.createElement(PopoutWindow, {
+        windowKey: key
+      }, React.createElement(channel.__proto__, {
+        ...channel.props
       }
-
-      // Prevent Discord from connecting to a voice channel
-      (await require('powercord/webpack').getModule([ 'clearVoiceChannel' ])).clearVoiceChannel();
-
-      // Make Discord think you're in dnd to prevent notifications from the popout
-      (await require('powercord/webpack').getModule([ 'makeTextChatNotification' ])).makeTextChatNotification =
-        function makeTextChatNotification () {
-          return void 0;
-        };
-
-      // Make the popup closable on MacOS
-      if (process.platform === 'darwin') {
-        const macCloseBtn = await require('powercord/util').waitFor('.macButtonClose-MwZ2nf');
-        macCloseBtn.addEventListener('click', () => {
-          const w = require('electron').remote.getCurrentWindow();
-          w.close();
-          w.destroy();
-        });
-      }
-
-      // Add a CSS class and value in GLOBAL_ENV for external plugins
-      document.body.classList.add('multitask-popout');
-      GLOBAL_ENV.MULTITASK_POPOUT = true;
-    });
-
-    const { webContents } = BrowserWindow.getFocusedWindow();
-    const opts = {
-      ...webContents.browserWindowOptions,
-      minWidth: 530,
-      minHeight: 320
-    };
-    delete opts.show;
-    delete opts.x;
-    delete opts.y;
-    delete opts.minWidth;
-    delete opts.minHeight;
-    const window = new BrowserWindow(opts);
-    /*
-     * if (GlasscordApi) {
-     *  Glasscord compatibility
-     *   window.webContents._preload = webContents._preload;
-     * }
-     */
-
-    window.webContents.once('did-finish-load', () => window.webContents.executeJavaScript(`(${func.toString()})()`));
-    window.on('close', () => window.destroy());
-    window.loadURL(route);
+      ))
+    ));
   }
 };
