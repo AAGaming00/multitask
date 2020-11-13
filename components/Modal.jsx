@@ -28,16 +28,16 @@ module.exports = React.memo(
         {accounts.map(acc => <>
           <FormTitle tag='h3'>{acc.name}</FormTitle>
           <div className='multitask-buttons'>
-            {/* <Button
+            <Button
               size={Button.Sizes.SMALL}
               color={Button.Colors.TRANSPARENT}
               onClick={() => {
                 closeModal();
-                open(acc.token);
+                open(void 0, void 0, acc.token);
               }}
             >
               Open New Window
-            </Button> */}
+            </Button>
             <Button
               size={Button.Sizes.SMALL}
               color={Button.Colors.TRANSPARENT}

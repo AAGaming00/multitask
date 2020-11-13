@@ -4,13 +4,12 @@
  */
 
 const { join } = require('path');
-const { remote: { BrowserWindow } } = require('electron');
 const { Plugin } = require('powercord/entities');
 const { Tooltip, PopoutWindow, Icons: { ExternalLink } } = require('powercord/components');
 const { inject, uninject } = require('powercord/injector');
 const { React, getModule, getModuleByDisplayName, constants: { Routes } } = require('powercord/webpack');
 const { open: openModal } = require('powercord/modal');
-const { sleep } = require('powercord/util');
+const { sleep, getOwnerInstance, waitFor } = require('powercord/util');
 
 const SwitchIcon = require('./components/SwitchIcon');
 const Settings = require('./components/Settings');
@@ -18,11 +17,13 @@ const Modal = require('./components/Modal');
 
 module.exports = class Multitask extends Plugin {
   async startPlugin () {
-    // if (window.GlasscordApi) { // @todo: Glasscord compatibility
-    //   this.error('Glasscord detected. Multitask is not compatible with Glasscord yet.');
-    //   this.error('Aborting startup.');
-    //   return;
-    // }
+    /*
+     * if (window.GlasscordApi) { // @todo: Glasscord compatibility
+     *   this.error('Glasscord detected. Multitask is not compatible with Glasscord yet.');
+     *   this.error('Aborting startup.');
+     *   return;
+     * }
+     */
 
     this.loadStylesheet('style.scss');
     powercord.api.settings.registerSettings('multitask', {
@@ -57,7 +58,7 @@ module.exports = class Multitask extends Plugin {
     const classes = await getModule([ 'iconWrapper', 'clickable' ]);
     const HeaderBarContainer = await getModuleByDisplayName('HeaderBarContainer');
     inject('multitask-icon', HeaderBarContainer.prototype, 'renderLoggedIn', (args, res) => {
-      /* if (res.props.toolbar && res.props.toolbar.props.children && res.props.toolbar.props.children[0][0]) {
+      if (res.props.toolbar && res.props.toolbar.props.children && res.props.toolbar.props.children[0][0]) {
         const guildId = res.props.toolbar.props.children[0][0].key === 'calls' ? '@me' : res.props.toolbar.props.children[1].key;
         const channelId = res.props.toolbar.props.children[0][1].props.channel.id;
         res.props.toolbar.props.children.unshift(
@@ -70,8 +71,8 @@ module.exports = class Multitask extends Plugin {
             className: [ 'multitask-icon', classes.icon ].join(' '),
             onClick: () => this._openPopout(guildId, channelId)
           })))
-        ); 
-      } */
+        );
+      }
 
       if (this.settings.get('accounts').length > 1) {
         const Switcher = React.createElement(Tooltip, {
@@ -84,7 +85,7 @@ module.exports = class Multitask extends Plugin {
           onClick: () =>
             openModal(() => React.createElement(Modal, {
               accounts: this.settings.get('accounts'),
-              open: this._openNewAccount.bind(this)
+              open: this._openPopout.bind(this)
             }))
         })));
 
@@ -97,61 +98,16 @@ module.exports = class Multitask extends Plugin {
 
       return res;
     });
+    this.reloadTitle();
   }
 
-  _openNewAccount (token) {
-    const func = (async () => {
-      // Make the popup closable on MacOS
-      if (process.platform === 'darwin') {
-        const macCloseBtn = await require('powercord/util').waitFor('.macButtonClose-MwZ2nf');
-        macCloseBtn.addEventListener('click', () => {
-          const w = require('electron').remote.getCurrentWindow();
-          w.close();
-          w.destroy();
-        });
-      }
-    });
-
-    const { webContents } = BrowserWindow.getFocusedWindow();
-    const currentOpts = webContents.browserWindowOptions;
-    const opts = {
-      ...currentOpts,
-      token,
-      minWidth: 530,
-      minHeight: 320,
-      powercordPreload: currentOpts.webPreferences.preload,
-      webPreferences: {
-        ...currentOpts.webPreferences,
-        preload: join(__dirname, 'preload.js')
-      }
-    };
-    delete opts.show;
-    delete opts.x;
-    delete opts.y;
-    delete opts.minWidth;
-    delete opts.minHeight;
-    const window = new BrowserWindow(opts);
-    /*
-     * if (GlasscordApi) {
-     *  Glasscord compatibility
-     *   window.webContents._preload = webContents._preload;
-     * }
-     */
-
-    window.on('close', () => window.destroy());
-    window.webContents.once('did-finish-load', () => window.webContents.executeJavaScript(`(${func.toString()})()`));
-    window.loadURL(location.href);
+  async reloadTitle () {
+    const { title } = await getModule([ 'title', 'chatContent' ]);
+    getOwnerInstance(await waitFor(`.${title}`)).forceUpdate();
   }
 
-  _openPopout (guildId, channelId) {
-    const channel = require('powercord/util').getOwnerInstance(document.querySelector('.chat-3bRxxu'));
-    getModule([ 'setAlwaysOnTop', 'open' ], false).open('DISCORD_POWERCORD_MULTITASK', (key) => (
-      React.createElement(PopoutWindow, {
-        windowKey: key
-      }, React.createElement(channel.__proto__, {
-        ...channel.props
-      }
-      ))
-    ));
+  _openPopout (guildId, channelId, token) {
+    require('./Window')({ url: guildId ? `${location.origin}/channels/${guildId}/${channelId}` : `${location.origin}/app `,
+      token }, 'discord', 'DISCORD_MULTITASK');
   }
 };
