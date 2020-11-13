@@ -2,6 +2,7 @@ const { React, getModule } = require('powercord/webpack');
 
 function Popout (props) {
   const divRef = div => {
+    console.group('[Multitask:Init]');
     console.log(div.ownerDocument.defaultView);
     props.resolve(div.ownerDocument.defaultView);
     const win = div.ownerDocument.defaultView;
@@ -36,6 +37,7 @@ function Popout (props) {
           if (props.token) {
             console.debug('[Multitask] Overriding localStorage');
             const _ael = win.document.addEventListener;
+            const oldToken = window.localStorage.token;
             win.document.addEventListener = function (...args) {
               if (args[0] !== 'beforeunload') {
                 _ael.call(this, ...args);
@@ -43,47 +45,53 @@ function Popout (props) {
             };
             const frame = win.document.createElement('iframe');
             win.document.body.appendChild(frame);
-            const ls = frame.contentWindow.localStorage;
-            const _setItem = ls.setItem;
+            const ls = JSON.parse(JSON.stringify(frame.contentWindow.localStorage));
             ls.setItem = function (key, value) {
               if (key === 'token') {
                 return console.debug('[Multitask] Prevented localStorage token update');
               }
-              _setItem.call(ls, key, value);
+              ls[key] = value;
             };
 
-            const _getItem = ls.getItem;
             ls.getItem = function (key) {
               if (key === 'token') {
                 console.debug('[Multitask] Attemped to get token');
                 return props.token;
               }
-              _getItem.call(ls, key);
+              return ls[key];
             };
 
-            /*
-             * Object.defineProperty(ls, 'token', {
-             *   get : () => {
-             *     console.log('[Multitask]: Attemped to get token directly');
-             *     return props.token;
-             *   },
-             *   set : () => console.debug('[Multitask] Prevented localStorage token update')
-             * });
-             */
+
+            Object.defineProperty(ls, 'token', {
+              get : () => {
+                console.log('[Multitask]: Attemped to get token directly');
+                return props.token;
+              },
+              set : () => console.debug('[Multitask] Prevented direct localStorage token update')
+            });
             win.localStorage = ls;
             Object.defineProperty(win, 'localStorage', {
               get : () => ls,
               set : (e) => console.debug('[Multitask] Prevented localStorage setter', e)
             });
+            frame.contentWindow.localStorage = ls;
+            Object.defineProperty(frame.contentWindow, 'localStorage', {
+              get : () => ls,
+              set : (e) => console.debug('[Multitask] Prevented frame localStorage setter', e)
+            });
+
             const wpinterval = setInterval(() => {
               if (win.webpackJsonp) {
                 console.debug('[Multitask] Logging in');
                 clearInterval(wpinterval);
-                Object.values(win.webpackJsonp.push([ [], { '':(_, e, r) => {
+                win.eval(`Object.values(webpackJsonp.push([ [], { '':(_, e, r) => {
                   e.cache = r.c;
-                } }, [ [ '' ] ] ]).cache).find(m => m.exports && m.exports.default && m.exports.default.loginToken !== void 0).exports.default.loginToken(props.token);
+                } }, [ [ '' ] ] ]).cache).find(m => m.exports && m.exports.default && m.exports.default.loginToken !== void 0).exports.default.loginToken("${props.token}")
+                 `);
+                window.localStorage.token = oldToken;
               }
             }, 1);
+            console.groupEnd('[Multitask:Init]');
           }
         }
       }, 1);
@@ -109,7 +117,7 @@ module.exports = function (props, name, id) {
         title: name
       }, React.createElement(Popout, { ...props,
         resolve })),
-    { frame: false,
+    { frame: true,
       chrome:false,
       status:false,
       menubar:false,
