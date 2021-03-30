@@ -1,107 +1,155 @@
+/*
+ * Copyright (c) 2020 AAGaming00
+ * Licensed under the Open Software License version 3.0
+ */
 const { React, getModule } = require('powercord/webpack');
+const { join } = require('path');
+const createDiscordNative = require('./DiscordNative');
+const nt = () => new Promise(res => process.nextTick(res))
 
 function Popout (props) {
-  const divRef = div => {
-    console.group('[Multitask:Init]');
-    console.log(div.ownerDocument.defaultView);
+  const divRef = async div => {
+    //console.group('[Multitask:Init]');
+    // console.log(div.ownerDocument.defaultView);
     props.resolve(div.ownerDocument.defaultView);
     const win = div.ownerDocument.defaultView;
+    // stop discord from yeeting the popout
+    const oFnc = window.Function;
+    window.Function = win.Function;
+    const yeetListener = (e) => {
+      console.debug('[Multitask] yeeted listener')
+      e.stopPropagation()
+    }
+    win.addEventListener('beforeunload', yeetListener, { capture: true })
     delete win.opener;
-    delete win.require;
-    delete win.DiscordNative;
     win.location.href = props.url;
-    win.addEventListener('beforeunload', () => {
-      const interval2 = setInterval(() => {
-        /*
-         * if (!win.location.href.includes('/popout') && !win.DiscordNative) {
-         *   win.DiscordNative = window._.cloneDeep(window.DiscordNative);
-         *   win.DiscordNative.userDataCache = window._.cloneDeep(DiscordNative.userDataCache);
-         *   win.DiscordNative.userDataCache.cacheUserData = () => true;
-         *   win.DiscordNative.userDataCache.getCached = () => new Promise(r => r(win.localStorage));
-         *   win.DiscordNative.userDataCache.deleteCached = () => [ 'h' ];
-         *   win.DiscordNative.nativeModules = window._.cloneDeep(DiscordNative.nativeModules);
-         *   win.DiscordNative.nativeModules.requireModule = (e) => {
-         *     const o = DiscordNative.nativeModules.requireModule(e);
-         *     if (e === 'discord_rpc') {
-         *       o.RPCWebSocket.http.createServer = () => new Promise(r => r({}));
-         *       o.RPCWebSocket.ws.Server = () => powercord.rpcServer;
-         *     }
-         *     console.debug('[Multitask] Proxying native module require', e, o);
-         *     return o;
-         *   };
-         * }
-         */
-
-        if (win.document.body && !win.location.href.includes('/popout')) {
-          clearInterval(interval2);
-          if (props.token) {
-            console.debug('[Multitask] Overriding localStorage');
-            const _ael = win.document.addEventListener;
-            const oldToken = window.localStorage.token;
-            win.document.addEventListener = function (...args) {
-              if (args[0] !== 'beforeunload') {
-                _ael.call(this, ...args);
-              }
-            };
-            const frame = win.document.createElement('iframe');
-            win.document.body.appendChild(frame);
-            const ls = JSON.parse(JSON.stringify(frame.contentWindow.localStorage));
-            ls.setItem = function (key, value) {
-              if (key === 'token') {
-                return console.debug('[Multitask] Prevented localStorage token update');
-              }
-              ls[key] = value;
-            };
-
-            ls.getItem = function (key) {
-              if (key === 'token') {
-                console.debug('[Multitask] Attemped to get token');
-                return props.token;
-              }
-              return ls[key];
-            };
-
-
-            Object.defineProperty(ls, 'token', {
-              get : () => {
-                console.log('[Multitask]: Attemped to get token directly');
-                return props.token;
-              },
-              set : () => console.debug('[Multitask] Prevented direct localStorage token update')
-            });
-            win.localStorage = ls;
-            Object.defineProperty(win, 'localStorage', {
-              get : () => ls,
-              set : (e) => console.debug('[Multitask] Prevented localStorage setter', e)
-            });
-            frame.contentWindow.localStorage = ls;
-            Object.defineProperty(frame.contentWindow, 'localStorage', {
-              get : () => ls,
-              set : (e) => console.debug('[Multitask] Prevented frame localStorage setter', e)
-            });
-
-            const wpinterval = setInterval(() => {
-              if (win.webpackJsonp) {
-                console.debug('[Multitask] Logging in');
-                clearInterval(wpinterval);
-                win.eval(`Object.values(webpackJsonp.push([ [], { '':(_, e, r) => {
-                  e.cache = r.c;
-                } }, [ [ '' ] ] ]).cache).find(m => m.exports && m.exports.default && m.exports.default.loginToken !== void 0).exports.default.loginToken("${props.token}")
-                 `);
-                window.localStorage.token = oldToken;
-              }
-            }, 1);
-            console.groupEnd('[Multitask:Init]');
-          }
-        }
-      }, 1);
-    });
-    const interval = setInterval(() => {
-      if (win.require) {
-        clearInterval(interval);
-        delete win.require;
+    delete win.require;
+    while (win.location.href.indexOf('/popout') > -1) {
+      await nt();
+    }
+    const oopener = win.opener
+    delete win.opener;
+    win.__isMultitask = true;
+    createDiscordNative(win)
+    console.debug('[Multitask] hm', Boolean(win.webpackJsonp))
+    function getNativeTitlebar (){
+      switch(process.platform){
+        case "win32": return "windows";
+        case "darwin": return "osx";
+        case "linux": default: return "linux";
       }
-    }, 10);
+    }
+    let patchedPush = false;
+
+    let wjp = new win.Array()
+
+    Object.defineProperty(win, "webpackJsonp", {
+      get: () => {
+        return wjp;
+      },
+      set: (newWebpackJsonp) => {
+        window.Function = win.Function;
+        //debugger;
+        if (!patchedPush && newWebpackJsonp.hasOwnProperty("push")) {
+          patchedPush = true;
+          originalPush = { ...newWebpackJsonp }.push;
+          newWebpackJsonp.push = ([something, modules, somethingElse]) => {
+            window.Function = win.Function;
+    
+            try {
+              const keys = win.Object.keys(modules);
+              for (const key of keys) {
+                const originalModule = win.Array.isArray(modules)
+                  ? [...modules][key]
+                  : { ...modules }[key];
+    
+                modules[key] = (exporter, t, webpackRequire) => {
+                  window.Function = win.Function;
+    
+                  modules[key] = originalModule;
+                  // console.debug('[Multitask] a') 
+                  win._module = originalModule;
+                  originalModule(exporter, t, webpackRequire);
+                  // console.debug('[Multitask] b') 
+                  
+                  if (exporter.exports?.default?.getToken && exporter.exports?.default?.hideToken) {
+                    console.debug('[Multitask] found token module', exporter.exports)
+                    const def = exporter.exports.default;
+                    const noop = () => {};
+                    if (props.token) def.getToken = () => props.token;
+                    def.hideToken = noop
+                    def.showToken = noop
+                    def.removeToken = noop
+                    def.setToken = noop
+
+                    // win.DiscordNative = {};
+                    // win.DiscordNative.window = {
+                    //   close: (k) => window.DiscordNative.close(k || win.name),
+                    //   fullscreen: (k) => window.DiscordNative.fullscreen(k || win.name),
+                    //   maximize: (k) => window.DiscordNative.maximize(k || win.name),
+                    //   minimize: (k) => window.DiscordNative.minimize(k || win.name),
+                    //   restore: (k) => window.DiscordNative.restore(k || win.name)
+                    // }
+                  }
+
+                  if (exporter.exports?.default?.toString?.().indexOf('macOSFrame') > -1) {
+                    console.debug('[Multitask] found titlebar module', exporter.exports)
+                    // based on some glasscord stuff
+                    
+                    const os = getNativeTitlebar()
+                    const titleBar = exporter.exports
+                    const orig = titleBar.default;
+                    titleBar.default = function(props) {
+                      props.type = os.toUpperCase();
+                      props.windowKey = win.name;
+                      const res = orig(props)
+                      return res
+                    };
+                    titleBar.default.toString = () => orig.toString();
+                    Object.assign(titleBar.default, orig)
+
+                    const appMount = win.document.getElementById("app-mount");
+                    appMount.classList.remove("platform-win");
+                    appMount.classList.remove("platform-osx");
+                    appMount.classList.remove("platform-linux");
+                
+                    const className = os == "windows" ? "win" : os;
+                    appMount.classList.add(`platform-${className}`);
+                  }
+    
+                  window.Function = oFnc;
+                };
+              }
+              window.Function = oFnc;
+            } catch (e) {
+              console.error("Something has gone horribly wrong.", e);
+            }
+            return originalPush(
+              somethingElse
+                ? [something, modules, somethingElse]
+                : [something, modules]
+            );
+          };
+        }
+    
+        wjp = newWebpackJsonp;
+    
+        window.Function = oFnc;
+      },
+    });
+    win.document.addEventListener('DOMContentLoaded', (event) => {
+      console.debug('[Multitask] DOM fully loaded and parsed', Boolean(win.webpackJsonp));
+      // win.console.log(win, win.webpackJsonp)
+    });
+    win.addEventListener('load', _ => {
+      win.removeEventListener('beforeunload', yeetListener, { capture: true })
+      oopener.popouts.set(win.name, win);
+    });
+    win.addEventListener('beforeunload', () => {
+      oopener.popouts.delete(win.name);
+    });
+
+    window.Function = oFnc;
   };
   return React.createElement('div', { ref: divRef });
 }
@@ -117,15 +165,10 @@ module.exports = function (props, name, id) {
         title: name
       }, React.createElement(Popout, { ...props,
         resolve })),
-    { frame: true,
-      chrome:false,
-      status:false,
-      menubar:false,
-      toolbar:false,
-      location:false,
-      resizable: false,
-      height: props.height,
-      width: props.width }
+    {
+      width: 500,
+      height: 500
+    }
     );
   });
 };

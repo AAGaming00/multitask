@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2020 Bowser65
+ * Copyright (c) 2020 Bowser65, AAGaming00
  * Licensed under the Open Software License version 3.0
  */
 
 const { join } = require('path');
 const { Plugin } = require('powercord/entities');
-const { Tooltip, PopoutWindow, Icons: { ExternalLink } } = require('powercord/components');
+const { Tooltip, Icons: { ExternalLink } } = require('powercord/components');
 const { inject, uninject } = require('powercord/injector');
 const { React, getModule, getModuleByDisplayName, constants: { Routes } } = require('powercord/webpack');
 const { open: openModal } = require('powercord/modal');
