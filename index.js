@@ -108,6 +108,6 @@ module.exports = class Multitask extends Plugin {
 
   _openPopout (guildId, channelId, token) {
     require('./Window')({ url: guildId ? `${location.origin}/channels/${guildId}/${channelId}` : `${location.origin}/app `,
-      token }, 'discord', 'DISCORD_MULTITASK');
+      token }, 'Discord', 'DISCORD_MULTITASK_' + Math.random().toString(36).substring(10));
   }
 };

@@ -238,19 +238,21 @@ module.exports = (win) => {
 
     win.createDiscordStream = (...args) => new win.MediaStream(...args);
 
-    win.DiscordNative = new win.Proxy(DiscordNative, {
-        get: function(obj, prop) {
-            // console.debug('[Multitask] DiscordNative getting', prop)
-            // The default behavior to return the value
-            return obj[prop];
-        },
-        set: function(obj, prop, value) {
-            // console.debug('[Multitask] DiscordNative setting', prop)
-            // The default behavior to store the value
-            // obj[prop] = value;
+    // win.DiscordNative = new win.Proxy(DiscordNative, {
+    //     get: function(obj, prop) {
+    //         // console.debug('[Multitask] DiscordNative getting', prop)
+    //         // The default behavior to return the value
+    //         return obj[prop];
+    //     },
+    //     set: function(obj, prop, value) {
+    //         // console.debug('[Multitask] DiscordNative setting', prop)
+    //         // The default behavior to store the value
+    //         // obj[prop] = value;
         
-            // Indicate success
-            return true;
-        }
-    })
+    //         // Indicate success
+    //         return true;
+    //     }
+    // })
+
+    win.DiscordNative = DiscordNative;
 }
