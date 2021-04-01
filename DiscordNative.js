@@ -37,7 +37,9 @@ module.exports = (win) => {
         submitLiveCrashReport: noop
     })
 
-    DiscordModules.set('discord_game_utils', {})
+    DiscordModules.set('discord_game_utils', {
+        findLaunchable: noop
+    })
 
     DiscordModules.set('discord_voice', {
         DegradationPreference: {
