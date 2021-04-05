@@ -42,9 +42,9 @@ module.exports = React.memo(
               size={Button.Sizes.SMALL}
               color={Button.Colors.TRANSPARENT}
               onClick={async () => {
-                const tokenModule = await getModule([ 'setToken' ]);
-                tokenModule.setToken(acc.token);
-                location.reload();
+                const loginManager = await getModule([ 'loginToken' ]);
+                loginManager.loginToken(acc.token);
+                closeModal();
               }}
             >
               Use in Current Window
